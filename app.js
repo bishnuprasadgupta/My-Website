@@ -63,6 +63,7 @@ orderForm.addEventListener("submit", (event) => {
   const formData = new FormData(orderForm);
   const name = formData.get("customerName").trim();
   const coffee = selectedCoffeeName.textContent;
+  const design = formData.get("design");
   const quantity = Number(formData.get("quantity"));
   const total = orderTotal.textContent;
   const pickup = formData.get("pickup");
@@ -74,7 +75,7 @@ orderForm.addEventListener("submit", (event) => {
   const heading = document.createElement("strong");
   heading.textContent = `Order #${orderNumber} placed!`;
   const details = document.createElement("span");
-  details.textContent = ` Thanks, ${name} — ${quantity} ${coffee}${quantity === 1 ? "" : "s"} for ${total}. Pickup: ${pickup}.`;
+  details.textContent = ` Thanks, ${name} — ${quantity} ${coffee}${quantity === 1 ? "" : "s"} with ${design} art for ${total}. Pickup: ${pickup}.`;
 
   orderToast.append(heading, details);
   orderToast.hidden = false;
@@ -127,3 +128,81 @@ copyLinkButton.addEventListener("click", async () => {
     copyLinkButton.textContent = "Press Ctrl+C";
   }
 });
+
+const scrollCup = document.querySelector(".scroll-cup-assembly");
+const coffeeSplash = document.querySelector(".coffee-splash-overlay");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+if (scrollCup && coffeeSplash && !reduceMotion.matches) {
+  let scrollFrame = 0;
+  let sparkleTimer;
+  let splashTimer;
+  let lastScrollEventTime = performance.now();
+  let lastScrollEventY = window.scrollY;
+  const scrollSamples = [{ time: lastScrollEventTime, position: lastScrollEventY }];
+
+  const updateCupPosition = () => {
+    const scrollPosition = window.scrollY;
+    scrollCup.style.setProperty("--cup-rotation", `${scrollPosition * 0.18}deg`);
+    scrollCup.style.setProperty("--cup-bounce", `${Math.sin(scrollPosition * 0.035) * 2}px`);
+    scrollFrame = 0;
+  };
+
+  const updateCupWhileScrolling = () => {
+    updateCupPosition();
+    scrollCup.classList.add("is-scrolling");
+    window.clearTimeout(sparkleTimer);
+    sparkleTimer = window.setTimeout(() => {
+      scrollCup.classList.remove("is-scrolling");
+    }, 420);
+  };
+
+  updateCupPosition();
+
+  window.addEventListener(
+    "scroll",
+    () => {
+      const now = performance.now();
+      const scrollY = window.scrollY;
+      const eventElapsed = Math.max(now - lastScrollEventTime, 1);
+      const eventSpeed = Math.abs(scrollY - lastScrollEventY) / eventElapsed;
+      lastScrollEventTime = now;
+      lastScrollEventY = scrollY;
+      scrollSamples.push({ time: now, position: scrollY });
+
+      while (scrollSamples.length > 1 && now - scrollSamples[0].time > 220) {
+        scrollSamples.shift();
+      }
+
+      const sampleDuration = now - scrollSamples[0].time;
+      let sampleDistance = 0;
+      for (let index = 1; index < scrollSamples.length; index += 1) {
+        sampleDistance += Math.abs(
+          scrollSamples[index].position - scrollSamples[index - 1].position
+        );
+      }
+      const sampleSpeed = sampleDistance / Math.max(sampleDuration, 1);
+      const isFastScroll =
+        sampleDuration >= 45 &&
+        sampleDuration <= 220 &&
+        sampleDistance >= 180 &&
+        sampleSpeed >= 1.8 &&
+        eventSpeed >= 1.8;
+
+      window.clearTimeout(splashTimer);
+      if (isFastScroll) {
+        coffeeSplash.classList.add("is-active");
+        splashTimer = window.setTimeout(() => {
+          coffeeSplash.classList.remove("is-active");
+        }, 280);
+      } else {
+        coffeeSplash.classList.remove("is-active");
+      }
+
+      if (!scrollFrame) {
+        scrollFrame = window.requestAnimationFrame(updateCupWhileScrolling);
+      }
+    },
+    { passive: true }
+  );
+}
